@@ -12,30 +12,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-import signal
-from contextlib import contextmanager
-
-
-@contextmanager
-def timeout(time):
-    # Register a function to raise a TimeoutError on the signal.
-    signal.signal(signal.SIGALRM, raise_timeout)
-    # Schedule the signal to be sent after ``time``.
-    signal.alarm(time)
-
-    try:
-        yield
-    except TimeoutError:
-        pass
-    finally:
-        # Unregister the signal so it won't be triggered
-        # if the timeout is not reached.
-        signal.signal(signal.SIGALRM, signal.SIG_IGN)
-
-
-def raise_timeout(signum, frame):
-    raise TimeoutError
-
 def FEN(board, white_turn, can_castle, en_passant, count_semi, moves):
 	letters = ["0","K","Q","R","B","N","P","p","n","b","r","q","k"]
 	castle = ["K","Q","k","q"]
@@ -83,14 +59,8 @@ def game(login=True):
 		board = np.zeros((8,8))
 		last_board = board.copy()
 
-		#stockfish = sf.Stockfish(parameters={"Threads": 1, "Maximum Thinking Time": 1})
-		#stockfish = sf.Stockfish("/home/gabriel/Downloads/stockfish_13_linux_x64_bmi2/stockfish_13_linux_x64_bmi2",parameters={"Threads": 1, "Maximum Thinking Time": 10})
-		#stockfish.set_elo_rating(2000)
 		stockfish = sf.Stockfish()
 		stockfish.set_depth(15)
-
-		# sudo apt-get install stockfish
-		#engine = chess.engine.SimpleEngine.popen_uci("/usr/games/toga2")
 
 		driver.get("https://lichess.org/")
 		WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CLASS_NAME, "lobby__app__content")))
@@ -101,9 +71,7 @@ def game(login=True):
 			username = driver.find_element_by_name("username")
 			password = driver.find_element_by_name("password")
 			username.send_keys("gbr98razr")
-			password.send_keys("141568313tijolos")
-			#username.send_keys("gbr98")
-			#password.send_keys("141568313")
+			password.send_keys("tester01")
 			driver.find_element_by_class_name("submit").click()
 			WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CLASS_NAME, "lobby__app__content")))
 
@@ -142,10 +110,9 @@ def game(login=True):
 				for j in range(len(pieces)):
 					pos = get_pos_by_class(driver, colors[i]+pieces[j])
 					for position in pos:
-						rank = round(position[0]/unit)#????
+						rank = round(position[0]/unit)
 						file = round(position[1]/unit)
 						board[rank,file] = (-2*i+1)*(j+1)
-						#print(colors[i],pieces[j],position)
 			return board.T
 
 		def flip_board(board):
@@ -159,8 +126,6 @@ def game(login=True):
 		moves = 1
 
 		if not playing_white:
-			#last_board = read_board(colors, pieces, driver, unit)
-			#last_board = flip_board(last_board)
 			last_board = np.array([[-3,-5,-4,-2,-1,-4,-5,-3],
 								  [-6,-6,-6,-6,-6,-6,-6,-6],
 								  [ 0, 0, 0, 0, 0, 0, 0, 0],
@@ -191,12 +156,7 @@ def game(login=True):
 				continue
 			if not playing_white:
 				board = flip_board(board)
-			'''
-			time.sleep(0.5)
-			board_check = read_board(colors, pieces, driver, unit)
-			if not playing_white:
-				board_check = flip_board(board_check)
-			'''
+			
 			if moves < 2:
 				if (board == last_board).all() or adapt:
 					adapt = False
@@ -238,19 +198,11 @@ def game(login=True):
 				print("incorrect FEN")
 				time.sleep(0.2)
 				continue
-			#move = stockfish.get_best_move()
-			'''
-			try:
-				with timeout(2):
-					move = stockfish.get_best_move_time(time_think)
-			except TimeoutError:
-				print("retrying with 10ms")
-				move = stockfish.get_best_move_time(10)
-			'''
+			
 			done = False
 			while not done:
 				try:
-					time_think = int(random()*100 + 50)
+					time_think = int(random()*300 + 100)
 					print("thinking for",time_think,"ms")
 					engine = chess.engine.SimpleEngine.popen_uci("/usr/games/stockfish")
 					board_chess = chess.Board(fen)
@@ -263,11 +215,9 @@ def game(login=True):
 				except:
 					move = str(list(board_chess.legal_moves)[int(random()*board_chess.legal_moves.count())])
 					done = True
-					#engine.quit()
 					print("retrying...")
 
 			# bot move
-			#time.sleep(random()*8)
 			start_i = 8-int(move[1]) if playing_white else int(move[1])-1
 			start_j = int(files.index(move[0])) if playing_white else 7-int(files.index(move[0]))
 			end_i = 8-int(move[3]) if playing_white else int(move[3])-1
@@ -278,40 +228,9 @@ def game(login=True):
 			action.click()
 			action.move_to_element_with_offset(el, end_j*unit + unit/2, end_i*unit + unit/2)
 			action.click()
-			'''
-			if (end_i == 0 and board[start_i, start_j] == 6) or (end_i == 7 and board[start_i, start_j] == -6):
-				action.move_to_element_with_offset(el, end_j*unit + unit/2, end_i*unit + unit/2)
-				action.click()
-				action.click()
-			'''
-			action.perform()
-			#time.sleep(0.5)
-
-			#input("make the move")
-			#move = stockfish.get_best_move_time(1000)
-
-			'''
-			last_board = board.copy()
-
-			if len(move) == 4:
-				start_i = 8-int(move[1])
-				start_j = int(files.index(move[0]))
-				end_i = 8-int(move[3])
-				end_j = int(files.index(move[2]))
-				board[end_i, end_j] = board[start_i, start_j]
-				board[start_i, start_j] = 0
-				if np.abs(board[end_i, end_j]) == 6 and last_board[end_i, end_j] == 0 and np.abs(start_j-end_j) == 1: #en passant
-					board[start_i+(-1 if playing_white else 1), start_j] = 0
-				if np.abs(board[end_i, end_j]) == 1 and end_j - start_j == 2: #kingside castle
-					board[end_i, 5] = board[end_i, 7]
-					board[end_i, 7] = 0
-				if np.abs(board[end_i, end_j]) == 1 and end_j - start_j == -2:#queenside castle
-					board[end_i, 3] = board[end_i, 0]
-					board[end_i, 0] = 0
 			
-			print(board)
-			adapt = True
-			'''
+			action.perform()
+			
 			last_board = board.copy()
 			semi_moves += 2
 			moves += 1
